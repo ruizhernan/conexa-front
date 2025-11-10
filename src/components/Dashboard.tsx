@@ -99,7 +99,7 @@ const Dashboard: React.FC = () => {
           return;
         }
 
-        let url = `http://localhost:8080/api/v1/${category}?page=${page}&limit=${limit}`;
+        let url = `http://srv559732.hstgr.cloud:8081/api/v1/${category}?page=${page}&limit=${limit}`;
         if (effectiveSearchTerm) {
           url += `&name=${effectiveSearchTerm}`;
         }
