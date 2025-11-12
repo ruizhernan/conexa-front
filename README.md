@@ -2,19 +2,19 @@
 
 Cliente front para challenge tecnico Conexa
 
-El proyecto se encuentra desplegado en: https://conexa-front-chi.vercel.app/signup
-
-Si queres correrlo local:
-
-Este cliente esta dockerizado, vas a necesitar Docker desktop si querés correrlo en local con la config que posee.
+Para correrlo local:
 
 Clona el repo
 
 Accede a la carpeta root (conexa-front)
 
-Ahí corre docker-compose up -d --build
+Corre en la terminal npm run dev
 
-Podes verlo en http://localhost:3000/signin
+Te va a mostrar el puerto en el que esta corriendo
+
+Probablemente acá http://localhost:5174/signin
+
+Como el back esta desplegado en un VPS, podés usar las siguientes credenciales / crear una nueva cuenta.
 
 Credenciales de prueba
 
