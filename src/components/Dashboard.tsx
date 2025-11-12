@@ -3,8 +3,29 @@ import { useNavigate } from 'react-router-dom';
 
 interface DataItem {
   uid?: string;
+  name?: string; // Explicitly add name at top level
+  title?: string; // Explicitly add title at top level
   properties?: {
     name?: string;
+    title?: string;
+    director?: string;
+    producer?: string;
+    release_date?: string;
+    episode_id?: number;
+    model?: string;
+    manufacturer?: string;
+    length?: string;
+    crew?: string;
+    passengers?: string;
+    starship_class?: string;
+    vehicle_class?: string;
+    height?: string;
+    mass?: string;
+    gender?: string;
+    hair_color?: string;
+    skin_color?: string;
+    eye_color?: string;
+    birth_year?: string;
     [key: string]: unknown;
   };
   description?: string;
@@ -72,6 +93,7 @@ const Dashboard: React.FC = () => {
   const categories = ['people', 'films', 'starships', 'vehicles'];
 
   useEffect(() => {
+    console.log('Data fetching useEffect triggered with dependencies:', { category, page, limit, effectiveSearchTerm });
     const fetchCategoryData = async () => {
       setLoading(true);
       setError(null);
@@ -79,58 +101,254 @@ const Dashboard: React.FC = () => {
       // Create a unique cache key for the current category, page, and effective search term
       const cacheKey = `${category}-${page}-${effectiveSearchTerm}`;
 
-      // Check if data is already in cache
-      if (fetchedCategoryData.has(cacheKey)) {
-        const cached = fetchedCategoryData.get(cacheKey);
-        if (cached) {
-          setData(cached.results);
-          setTotalPages(cached.totalPages);
-          setLoading(false);
-          return;
-        }
-      }
+            // Check if data is already in cache
+            if (category !== 'films' && category !== 'starships' && category !== 'vehicles' && fetchedCategoryData.has(cacheKey)) { // Temporarily bypass cache for 'films', 'starships', and 'vehicles'
+              const cached = fetchedCategoryData.get(cacheKey);
+              if (cached) {
+                setData(cached.results);
+                setTotalPages(cached.totalPages);
+                setLoading(false);
+                return;
+              }
+            }
+      
+            try {
+              const token = localStorage.getItem('jwt_token');
+              console.log('Token in localStorage:', token);
+              if (!token) {
+                console.log('No token found, logging out...');
+                logoutUser();
+                return;
+              }
+      
+              let url = `http://srv559732.hstgr.cloud:8080/api/v1/${category}?page=${page}&limit=${limit}`;
+              if (effectiveSearchTerm) {
+                url += `&name=${effectiveSearchTerm}`;
+              }
+      
+              const response = await fetch(url,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+      
+              if (!response.ok) {
+                if (response.status === 401) {
+                  // If token is invalid or expired, logout
+                  logoutUser();
+                  return;
+                }
+                throw new Error(`Error fetching ${category} data: ${response.statusText}`);
+              }
+      
+              const result = await response.json();
+              let newResults: DataItem[] = result.results || [];
+              const newTotalPages = result.totalPages || 1;
+      
+              if (category === 'people' && newResults.length > 0) {
+                const detailedPeoplePromises = newResults.map(async (person) => {
+                  let updatedPerson: DataItem = { ...person }; // Start with the original person object
+                  if (person.uid) {
+                    const detailUrl = `http://srv559732.hstgr.cloud:8080/api/v1/people/${person.uid}`;
+                    try {
+                      const detailResponse = await fetch(detailUrl, {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                        },
+                      });
+                      if (!detailResponse.ok) {
+                        console.error(`Error fetching details for ${person.uid}: ${detailResponse.statusText}`);
+                        updatedPerson.properties = updatedPerson.properties || {}; // Ensure properties is an object
+                        return updatedPerson;
+                      }
+                      const detailResult = await detailResponse.json();
+                      if (detailResult.result && detailResult.result.properties) {
+                        updatedPerson.properties = detailResult.result.properties;
+                      } else {
+                        updatedPerson.properties = updatedPerson.properties || {}; // Ensure properties is an object
+                      }
+                    } catch (detailErr) {
+                      console.error(`Exception fetching details for ${person.uid}:`, detailErr);
+                      updatedPerson.properties = updatedPerson.properties || {}; // Ensure properties is an object
+                    }
+                  } else {
+                    updatedPerson.properties = updatedPerson.properties || {}; // Ensure properties is an object if uid is missing
+                  }
+                  return updatedPerson;
+                });
+                newResults = await Promise.all(detailedPeoplePromises);
+              } else if (category === 'films' && newResults.length > 0) { // Add detailed fetching for films
+                const detailedFilmPromises = newResults.map(async (film) => {
+                  let updatedFilm: DataItem = { ...film };
+                  if (film.uid) {
+                    const detailUrl = `http://srv559732.hstgr.cloud:8080/api/v1/films/${film.uid}`;
+                    try {
+                      const detailResponse = await fetch(detailUrl, {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                        },
+                      });
+                      if (!detailResponse.ok) {
+                        console.error(`Error fetching details for ${film.uid}: ${detailResponse.statusText}`);
+                        updatedFilm.properties = updatedFilm.properties || {};
+                        return updatedFilm;
+                      }
+                      const detailResult = await detailResponse.json();
+                      if (detailResult.result && detailResult.result.properties) {
+                        updatedFilm.properties = detailResult.result.properties;
+                      } else {
+                        updatedFilm.properties = updatedFilm.properties || {};
+                      }
+                    } catch (detailErr) {
+                      console.error(`Exception fetching details for ${film.uid}:`, detailErr);
+                      updatedFilm.properties = updatedFilm.properties || {};
+                    }
+                  } else {
+                    updatedFilm.properties = updatedFilm.properties || {};
+                  }
+                  return updatedFilm;
+                });
+                newResults = await Promise.all(detailedFilmPromises);
+              } else if (category === 'starships' && newResults.length > 0) { // Add detailed fetching for starships
+                const detailedStarshipPromises = newResults.map(async (starship) => {
+                  let updatedStarship: DataItem = { ...starship };
+                  if (starship.uid) {
+                    const detailUrl = `http://srv559732.hstgr.cloud:8080/api/v1/starships/${starship.uid}`;
+                    try {
+                      const detailResponse = await fetch(detailUrl, {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                        },
+                      });
+                      if (!detailResponse.ok) {
+                        console.error(`Error fetching details for ${starship.uid}: ${detailResponse.statusText}`);
+                        updatedStarship.properties = updatedStarship.properties || {};
+                        return updatedStarship;
+                      }
+                      const detailResult = await detailResponse.json();
+                      if (detailResult.result && detailResult.result.properties) {
+                        updatedStarship.properties = detailResult.result.properties;
+                      } else {
+                        updatedStarship.properties = updatedStarship.properties || {};
+                      }
+                    } catch (detailErr) {
+                      console.error(`Exception fetching details for ${starship.uid}:`, detailErr);
+                      updatedStarship.properties = updatedStarship.properties || {};
+                    }
+                  } else {
+                    updatedStarship.properties = updatedStarship.properties || {};
+                  }
+                  return updatedStarship;
+                });
+                newResults = await Promise.all(detailedStarshipPromises);
+              } else if (category === 'vehicles' && newResults.length > 0) { // Add detailed fetching for vehicles
+                const detailedVehiclePromises = newResults.map(async (vehicle) => {
+                  let updatedVehicle: DataItem = { ...vehicle };
+                  if (vehicle.uid) {
+                    const detailUrl = `http://srv559732.hstgr.cloud:8080/api/v1/vehicles/${vehicle.uid}`;
+                    try {
+                      const detailResponse = await fetch(detailUrl, {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                        },
+                      });
+                      if (!detailResponse.ok) {
+                        console.error(`Error fetching details for ${vehicle.uid}: ${detailResponse.statusText}`);
+                        updatedVehicle.properties = updatedVehicle.properties || {};
+                        return updatedVehicle;
+                      }
+                      const detailResult = await detailResponse.json();
+                      if (detailResult.result && detailResult.result.properties) {
+                        updatedVehicle.properties = detailResult.result.properties;
+                      } else {
+                        updatedVehicle.properties = updatedVehicle.properties || {};
+                      }
+                    } catch (detailErr) {
+                      console.error(`Exception fetching details for ${vehicle.uid}:`, detailErr);
+                      updatedVehicle.properties = updatedVehicle.properties || {};
+                      }
+                  } else {
+                    updatedVehicle.properties = updatedVehicle.properties || {};
+                  }
+                  return updatedVehicle;
+                });
+                newResults = await Promise.all(detailedVehiclePromises);
+              }
+      
+              setData(newResults);
+              setTotalPages(newTotalPages);
+      
+              // Update the cache
+              setFetchedCategoryData(prev => new Map(prev).set(cacheKey, { results: newResults, totalPages: newTotalPages }));
+      
+            } catch (err: unknown) {
+              if (err instanceof Error) {
+                setError(err.message);
+              } else {
+                setError(String(err));
+              }
+              setData([]);
+            } finally {
+              setLoading(false);
+            }
+          };
+      
+          fetchCategoryData();
+        }, [category, page, limit, effectiveSearchTerm, logoutUser]);
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1); // Reset page to 1 for any new search
 
+    if (!searchTerm) {
+      // If search term is empty, revert to general category search
+      setEffectiveSearchTerm('');
+      return;
+    }
+
+    const id = parseInt(searchTerm);
+    if (!isNaN(id)) {
+      // If it's a valid ID, perform search by ID
+      setLoading(true);
+      setError(null);
       try {
         const token = localStorage.getItem('jwt_token');
-        console.log('Token in localStorage:', token);
         if (!token) {
-          console.log('No token found, logging out...');
           logoutUser();
           return;
         }
 
-        let url = `http://srv559732.hstgr.cloud:8081/api/v1/${category}?page=${page}&limit=${limit}`;
-        if (effectiveSearchTerm) {
-          url += `&name=${effectiveSearchTerm}`;
-        }
-
-        const response = await fetch(url,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const url = `http://srv559732.hstgr.cloud:8080/api/v1/${category}/${id}`;
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           if (response.status === 401) {
-            // If token is invalid or expired, logout
             logoutUser();
             return;
           }
-          throw new Error(`Error fetching ${category} data: ${response.statusText}`);
+          throw new Error(`Error fetching ${category} with ID ${id}: ${response.statusText}`);
         }
 
         const result = await response.json();
-        const newResults = result.results || [];
-        const newTotalPages = result.totalPages || 1;
-
-        setData(newResults);
-        setTotalPages(newTotalPages);
-
-        // Update the cache
-        setFetchedCategoryData(prev => new Map(prev).set(cacheKey, { results: newResults, totalPages: newTotalPages }));
-
+        if (result.result) {
+          // The detailed response has properties nested under 'result.result.properties'
+          // and uid at 'result.result.uid'
+          const item: DataItem = {
+            uid: result.result.uid,
+            description: result.result.description,
+            properties: result.result.properties,
+          };
+          setData([item]); // Display only the fetched item
+          setTotalPages(1); // Only one page for a single item
+        } else {
+          setData([]);
+          setTotalPages(1);
+        }
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);
@@ -141,15 +359,11 @@ const Dashboard: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchCategoryData();
-  }, [category, page, limit, effectiveSearchTerm, logoutUser, fetchedCategoryData]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setEffectiveSearchTerm(searchTerm);
+    } else {
+      // If not a valid ID, perform general search by name (if applicable)
+      setEffectiveSearchTerm(searchTerm);
+      console.log('Effective search term updated to:', searchTerm);
+    }
   };
 
   const renderTableHeaders = () => {
@@ -205,47 +419,39 @@ const Dashboard: React.FC = () => {
 
       if (category === 'films') {
         rowData.uid = item.uid;
-        if (item.properties) {
-          rowData.title = item.properties.title;
-          rowData.director = item.properties.director;
-          rowData.producer = item.properties.producer;
-          rowData.release_date = item.properties.release_date;
-          rowData.episode_id = item.properties.episode_id;
-        }
+        rowData.title = item.properties?.title || item.title;
+        rowData.director = item.properties?.director;
+        rowData.producer = item.properties?.producer;
+        rowData.release_date = item.properties?.release_date;
+        rowData.episode_id = item.properties?.episode_id;
       } else if (category === 'people') {
         rowData.uid = item.uid;
-        if (item.properties) {
-          rowData.name = item.properties.name;
-          rowData.height = item.properties.height;
-          rowData.mass = item.properties.mass;
-          rowData.gender = item.properties.gender;
-          rowData.hair_color = item.properties.hair_color;
-          rowData.skin_color = item.properties.skin_color;
-          rowData.eye_color = item.properties.eye_color;
-          rowData.birth_year = item.properties.birth_year;
-        }
+        rowData.name = item.properties?.name || item.name;
+        rowData.height = item.properties?.height;
+        rowData.mass = item.properties?.mass;
+        rowData.gender = item.properties?.gender;
+        rowData.hair_color = item.properties?.hair_color;
+        rowData.skin_color = item.properties?.skin_color;
+        rowData.eye_color = item.properties?.eye_color;
+        rowData.birth_year = item.properties?.birth_year;
       } else if (category === 'starships') {
         rowData.uid = item.uid;
-        if (item.properties) {
-          rowData.name = item.properties.name;
-          rowData.model = item.properties.model;
-          rowData.manufacturer = item.properties.manufacturer;
-          rowData.length = item.properties.length;
-          rowData.crew = item.properties.crew;
-          rowData.passengers = item.properties.passengers;
-          rowData.starship_class = item.properties.starship_class;
-        }
+        rowData.name = item.properties?.name || item.name;
+        rowData.model = item.properties?.model;
+        rowData.manufacturer = item.properties?.manufacturer;
+        rowData.length = item.properties?.length;
+        rowData.crew = item.properties?.crew;
+        rowData.passengers = item.properties?.passengers;
+        rowData.starship_class = item.properties?.starship_class;
       } else if (category === 'vehicles') {
         rowData.uid = item.uid;
-        if (item.properties) {
-          rowData.name = item.properties.name;
-          rowData.model = item.properties.model;
-          rowData.manufacturer = item.properties.manufacturer;
-          rowData.length = item.properties.length;
-          rowData.crew = item.properties.crew;
-          rowData.passengers = item.properties.passengers;
-          rowData.vehicle_class = item.properties.vehicle_class;
-        }
+        rowData.name = item.properties?.name || item.name;
+        rowData.model = item.properties?.model;
+        rowData.manufacturer = item.properties?.manufacturer;
+        rowData.length = item.properties?.length;
+        rowData.crew = item.properties?.crew;
+        rowData.passengers = item.properties?.passengers;
+        rowData.vehicle_class = item.properties?.vehicle_class;
       } else {
         if (item.properties && item.properties.name !== undefined) {
           rowData.Name = item.properties.name;
@@ -313,7 +519,7 @@ const Dashboard: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
-            <button type="submit" className="search-button">Search</button>
+            <button type="submit" className="search-button">Search by ID</button>
           </form>
         </div>
 
